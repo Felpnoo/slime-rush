@@ -3,46 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Slime Rush Evolution - Amanda Edition</title>
+    <title>Slime Rush Evolution</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { box-shadow: 0 0 20px rgba(0, 255, 150, 0.2); border-radius: 8px; }
+        body { margin: 0; background: #050505; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: sans-serif; }
+        canvas { box-shadow: 0 0 30px rgba(0, 255, 150, 0.15); border: 1px solid #1f1f1f; border-radius: 12px; }
     </style>
 </head>
 <body>
 <script>
-// Configurações de Dificuldade (Conforme pedido pela Amanda)
 const SETTINGS = {
-    EASY:   { label: "FÁCIL",   min: 1, max: 1, tripleChance: 0,    speed: 1000 },
-    MEDIUM: { label: "MÉDIO",   min: 1, max: 2, tripleChance: 0.08, speed: 800 },
-    HARD:   { label: "DIFÍCIL", min: 1, max: 3, tripleChance: 0.25, speed: 600 }
+    EASY:   { label: "FÁCIL",   max: 1, tripleChance: 0,    speed: 1000, color: '#00ff96' },
+    MEDIUM: { label: "MÉDIO",   max: 2, tripleChance: 0.08, speed: 800,  color: '#00d4ff' },
+    HARD:   { label: "DIFÍCIL", max: 3, tripleChance: 0.25, speed: 600,  color: '#ff007a' }
 };
 
 class MenuScene extends Phaser.Scene {
     constructor() { super('MenuScene'); }
     preload() {
-        // Correção do erro: Phaser 3.60 usa setCORS
         this.load.setCORS('anonymous');
-        this.load.baseURL = 'assets/'; // Garanta que as imagens estão na pasta assets/
-        
-        for (let i = 1; i <= 11; i++) {
+        this.load.baseURL = 'assets/';
+        // Carrega apenas os que você tem (1 ao 6)
+        for (let i = 1; i <= 6; i++) {
             this.load.image(`slime_${i}`, `slime_${i}.png`);
         }
     }
     create() {
-        this.add.text(225, 150, 'SLIME RUSH\nEVOLUTION', { 
-            fontSize: '40px', fill: '#0f0', align: 'center', fontStyle: 'bold' 
-        }).setOrigin(0.5);
+        this.add.text(225, 180, 'SLIME RUSH', { fontSize: '48px', fill: '#00ff96', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5);
+        this.add.text(225, 230, 'EVOLUTION', { fontSize: '24px', fill: '#fff', letterSpacing: 10 }).setOrigin(0.5);
 
         ['EASY', 'MEDIUM', 'HARD'].forEach((diff, i) => {
-            let btn = this.add.text(225, 400 + (i * 80), SETTINGS[diff].label, { 
-                fontSize: '32px', fill: '#fff', backgroundColor: '#222', padding: {x:20, y:10}
-            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-            btn.on('pointerdown', () => this.scene.start('MainScene', { difficulty: diff }));
-            btn.on('pointerover', () => btn.setStyle({ fill: '#0f0' }));
-            btn.on('pointerout', () => btn.setStyle({ fill: '#fff' }));
+            let config = SETTINGS[diff];
+            let btnBg = this.add.rectangle(225, 450 + (i * 85), 280, 60, 0x111111).setInteractive({ useHandCursor: true });
+            let btnText = this.add.text(225, 450 + (i * 85), config.label, { fontSize: '24px', fill: config.color, fontStyle: 'bold' }).setOrigin(0.5);
+            
+            btnBg.setStrokeStyle(2, 0x333333);
+            btnBg.on('pointerdown', () => this.scene.start('MainScene', { difficulty: diff }));
+            btnBg.on('pointerover', () => { btnBg.setStrokeStyle(3, parseInt(config.color.replace('#','0x'))); btnText.setScale(1.1); });
+            btnBg.on('pointerout', () => { btnBg.setStrokeStyle(2, 0x333333); btnText.setScale(1.0); });
         });
     }
 }
@@ -52,29 +50,30 @@ class MainScene extends Phaser.Scene {
     init(data) {
         this.diff = SETTINGS[data.difficulty || 'MEDIUM'];
         this.score = 0;
-        this.isGameOver = false;
-        this.isTrailer = false;
+        this.grid = Array(4).fill().map(() => Array(4).fill(null));
     }
     create() {
-        this.slimes = this.add.group({ maxSize: 16 });
-        this.grid = Array(4).fill().map(() => Array(4).fill(null));
-        
-        // Criar Background do Grid
-        for(let r=0; r<4; r++)
-            for(let c=0; c<4; c++)
-                this.add.rectangle(c * 100 + 75, r * 100 + 250, 90, 90, 0x1a1a1a);
+        // Grid Visual Moderno
+        const graphics = this.add.graphics();
+        graphics.lineStyle(2, 0x1f1f1f);
+        for(let r=0; r<4; r++) {
+            for(let c=0; c<4; c++) {
+                graphics.strokeRoundedRect(c * 105 + 25, r * 105 + 200, 95, 95, 10);
+            }
+        }
 
+        this.slimes = this.add.group();
         this.spawnSlime(2);
-        this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: '24px', fill: '#fff' });
         
-        // Tecla T para o Trailer no NixOS
+        this.scoreText = this.add.text(225, 80, '0', { fontSize: '80px', fill: '#fff', fontStyle: 'bold', alpha: 0.2 }).setOrigin(0.5);
+        
+        // Tecla T para o Trailer (NixOS/Hyprland)
         this.input.keyboard.on('keydown-T', () => this.startTrailer());
     }
 
     spawnSlime(forced = null) {
-        if (this.isGameOver) return;
         let slots = this.getEmpty();
-        if (slots.length === 0) return this.endGame();
+        if (slots.length === 0) return this.scene.start('MenuScene');
 
         let count = forced || 1;
         if (!forced) {
@@ -91,51 +90,58 @@ class MainScene extends Phaser.Scene {
     }
 
     addSlime(r, c, lvl) {
-        let s = this.slimes.get(c * 100 + 75, r * 100 + 250, `slime_${lvl}`);
-        if (s) {
-            s.setActive(true).setVisible(true).setScale(0).setAlpha(1);
-            s.level = lvl; s.gridR = r; s.gridC = c;
-            this.grid[r][c] = s;
-            this.tweens.add({ targets: s, scale: 1, duration: 200, ease: 'Back.out' });
+        let x = c * 105 + 72.5;
+        let y = r * 105 + 247.5;
+        
+        // Se a imagem não existe (lvl > 6), desenha um círculo colorido
+        let s;
+        if (lvl > 6) {
+            s = this.add.circle(x, y, 40, 0xff007a).setStrokeStyle(4, 0xffffff);
+        } else {
+            s = this.add.image(x, y, `slime_${lvl}`).setDisplaySize(85, 85);
         }
+
+        s.level = lvl; s.gridR = r; s.gridC = c;
+        this.grid[r][c] = s;
+        s.setScale(0);
+        this.tweens.add({ targets: s, scale: 1, duration: 300, ease: 'Back.out' });
     }
 
     merge(s1, s2) {
         let nLvl = s1.level + 1;
-        this.cameras.main.shake(100, 0.01);
+        this.cameras.main.shake(150, 0.005);
         
-        if (nLvl === 11) { // 2048 - Efeito Especial Amanda
-            this.cameras.main.flash(1000, 255, 215, 0);
-            this.time.timeScale = 0.5;
-            this.time.delayedCall(1000, () => this.time.timeScale = 1);
+        this.grid[s1.gridR][s1.gridC] = null;
+        s1.destroy();
+        
+        // Atualiza s2 para o novo nível
+        s2.level = nLvl;
+        if (nLvl <= 6) {
+            s2.setTexture(`slime_${nLvl}`).setDisplaySize(85, 85);
+        } else {
+            // Fallback visual para níveis sem imagem (2048 etc)
+            s2.destroy();
+            this.addSlime(s2.gridR, s2.gridC, nLvl);
         }
 
-        this.grid[s1.gridR][s1.gridC] = null;
-        s1.setActive(false).setVisible(false);
-        s2.setTexture(`slime_${nLvl}`);
-        s2.level = nLvl;
-
         this.score += Math.pow(2, nLvl);
-        this.scoreText.setText(`Score: ${this.score}`);
-        this.time.delayedCall(300, () => this.spawnSlime());
+        this.scoreText.setText(this.score);
+        this.time.delayedCall(200, () => this.spawnSlime());
     }
 
-    // Lógica do Trailer (Autoplay)
     startTrailer() {
-        if (this.isTrailer) return;
-        this.isTrailer = true;
-        this.cameras.main.zoomTo(1.1, 2000);
+        this.cameras.main.zoomTo(1.1, 2000, 'Cubic.easeInOut');
         this.time.addEvent({
-            delay: 600,
+            delay: 700,
             callback: () => {
                 let moved = false;
                 for(let r=0; r<4; r++) {
                     for(let c=0; c<4; c++) {
                         let s1 = this.grid[r][c];
                         if (!s1) continue;
-                        [[0,1],[1,0],[0,-1],[-1,0]].forEach(([dr, dc]) => {
+                        [[0,1],[1,0]].forEach(([dr, dc]) => {
                             let nr = r+dr, nc = c+dc;
-                            if(nr>=0 && nr<4 && nc>=0 && nc<4 && !moved) {
+                            if(nr<4 && nc<4 && !moved) {
                                 let s2 = this.grid[nr][nc];
                                 if(s2 && s2.level === s1.level) { this.merge(s1, s2); moved = true; }
                             }
@@ -153,17 +159,12 @@ class MainScene extends Phaser.Scene {
         for(let r=0; r<4; r++) for(let c=0; c<4; c++) if(!this.grid[r][c]) e.push({r,c});
         return e;
     }
-
-    endGame() {
-        this.isGameOver = true;
-        this.add.text(225, 400, 'FIM DE JOGO', { fontSize: '48px', fill: '#f00', fontStyle: 'bold' }).setOrigin(0.5);
-    }
 }
 
 const config = {
     type: Phaser.AUTO,
     width: 450, height: 800,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#050505',
     parent: 'game-container',
     scene: [MenuScene, MainScene]
 };
