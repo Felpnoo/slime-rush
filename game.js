@@ -8,12 +8,12 @@ class MenuScene extends Phaser.Scene {
     constructor() { super('MenuScene'); }
 
     preload() {
-        // CORREÇÃO DO ERRO AQUI: Definindo como propriedade
-        this.load.crossOrigin = 'anonymous';
+        // CORREÇÃO: No Phaser 3.60 usamos setCORS
+        this.load.setCORS('anonymous');
         
-        // Carregue seus assets aqui (ajuste os caminhos se necessário)
-        this.load.image('bg', 'assets/background.png');
+        // Carregamento dos Slimes (1 a 11)
         for (let i = 1; i <= 11; i++) {
+            // Se estiver usando o GitHub Pages, garanta que o caminho 'assets/' esteja correto
             this.load.image(`slime_${i}`, `assets/slime_${i}.png`);
         }
     }
@@ -46,17 +46,15 @@ class MainScene extends Phaser.Scene {
     }
 
     create() {
-        // Grid e Pooling
         this.slimes = this.add.group({ maxSize: 16 });
         this.gridItems = Array(4).fill().map(() => Array(4).fill(null));
 
         this.setupBoard();
         this.spawnSlime(2);
 
-        // Score Text
         this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: '24px', fill: '#fff' });
 
-        // Atalho para Trailer (Aperte T no NixOS)
+        // Atalho para Trailer (Aperte T no seu teclado)
         this.input.keyboard.on('keydown-T', () => this.startTrailerMode());
     }
 
@@ -68,7 +66,7 @@ class MainScene extends Phaser.Scene {
         let count = forcedCount || 1;
         if (!forcedCount) {
             let roll = Math.random();
-            // Lógica Amanda: Spawn de 3 no Médio e Hard
+            // Implementação da sugestão da Amanda (3 slimes no Médio/Hard)
             if (this.config.max === 3 && roll < this.config.tripleChance) count = 3;
             else if (this.config.max >= 2 && roll > 0.6) count = 2;
         }
@@ -96,7 +94,7 @@ class MainScene extends Phaser.Scene {
         let nextLevel = s1.level + 1;
         this.cameras.main.shake(100, 0.01);
         
-        if (nextLevel === 11) { // 2048 - Efeito Amanda
+        if (nextLevel === 11) { // 2048 - Efeito Especial
             this.cameras.main.flash(1000, 255, 215, 0);
             this.time.timeScale = 0.5;
             this.time.delayedCall(1000, () => this.time.timeScale = 1);
@@ -113,21 +111,20 @@ class MainScene extends Phaser.Scene {
         this.time.delayedCall(300, () => this.spawnSlime());
     }
 
+    // --- MODO TRAILER AUTOMÁTICO ---
     startTrailerMode() {
         if (this.isTrailerActive) return;
         this.isTrailerActive = true;
         this.cameras.main.zoomTo(1.1, 2000);
-        console.log("🎥 Gravando trailer...");
-
+        
         this.time.addEvent({
-            delay: 600,
+            delay: 650,
             callback: () => this.autoPlay(),
             loop: true
         });
     }
 
     autoPlay() {
-        // Busca par para merge automático no vídeo
         for(let r=0; r<4; r++) {
             for(let c=0; c<4; c++) {
                 let s1 = this.gridItems[r][c];
@@ -164,7 +161,7 @@ class MainScene extends Phaser.Scene {
 
     gameOver() {
         this.isGameOver = true;
-        this.add.text(225, 400, 'GAME OVER', { fontSize: '64px', fill: '#f00' }).setOrigin(0.5);
+        this.add.text(225, 400, 'FIM DE JOGO', { fontSize: '48px', fill: '#f00' }).setOrigin(0.5);
     }
 }
 
