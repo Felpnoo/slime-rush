@@ -3,20 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slime Rush Evolution: Pro</title>
+    
+    <title>Slime Rush Evolution</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
             width: 100vw; height: 100vh;
             background-color: #050505;
             display: flex; justify-content: center; align-items: center;
-            overflow: hidden; font-family: 'Segoe UI', sans-serif;
+            overflow: hidden; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
-        #game-container { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; }
+        #game-container { 
+            display: flex; justify-content: center; align-items: center; 
+            width: 100%; height: 100%; 
+        }
         canvas { 
             border: 2px solid rgba(0, 255, 127, 0.4); 
             border-radius: 12px; 
-            box-shadow: 0 0 30px rgba(0, 255, 127, 0.3); 
+            box-shadow: 0 0 35px rgba(0, 255, 127, 0.25); 
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
@@ -25,35 +34,29 @@
 <div id="game-container"></div>
 <script>
     // ==========================================
-    // 1. CONFIGURAÇÕES E ECONOMIA
+    // 1. CONFIGURAÇÕES E DADOS
     // ==========================================
-    const DEV_MODE = true; 
+    const DEV_MODE = false; // DESATIVADO PARA LANÇAMENTO
     let GameSettings = { language: 'pt', soundOn: true, musicOn: true };
     
-    // Dados persistentes
     let UserData = {
         coins: parseInt(localStorage.getItem('slime_coins')) || 0,
         highScore: parseInt(localStorage.getItem('slime_highscore')) || 0,
         unlocked: JSON.parse(localStorage.getItem('slimes_unlocked')) || [0]
     };
 
-    function saveUserData() {
-        localStorage.setItem('slime_coins', UserData.coins);
-        localStorage.setItem('slime_highscore', UserData.highScore);
-        localStorage.setItem('slimes_unlocked', JSON.stringify(UserData.unlocked));
-    }
-
     const TEXTS = {
-        pt: { title: "SLIME RUSH", play: "JOGAR", settings: "AJUSTES", album: "COLEÇÃO", back: "VOLTAR", score: "PONTOS", best: "RECORDE", gameover: "FIM DE JOGO", restart: "RECOMEÇAR", new: "DESCOBERTO!", on: "LIG", off: "DESL", next: "PRÓXIMO", menu: "MENU", sound: "SOM: ", music: "MÚSICA: ", revive: "REVIVER", watchAd: "VER AD", cost: "50 MOEDAS" },
-        en: { title: "SLIME RUSH", play: "PLAY", settings: "SETTINGS", album: "ALBUM", back: "BACK", score: "SCORE", best: "BEST", gameover: "GAME OVER", restart: "RESTART", new: "NEW!", on: "ON", off: "OFF", next: "NEXT", menu: "MENU", sound: "SFX: ", music: "MUSIC: ", revive: "REVIVE", watchAd: "WATCH AD", cost: "50 COINS" }
+        pt: { title: "SLIME RUSH", play: "JOGAR", settings: "AJUSTES", album: "COLEÇÃO", back: "VOLTAR", score: "PONTOS", best: "RECORDE", gameover: "FIM DE JOGO", restart: "RECOMEÇAR", new: "DESCOBERTO!", on: "LIG", off: "DESL", next: "PRÓXIMO", menu: "MENU", sound: "SOM: ", music: "MÚSICA: ", revive: "REVIVER", watchAd: "VER AD", cost: "50 MOEDAS", credits: "developed by FelpnooDev" },
+        en: { title: "SLIME RUSH", play: "PLAY", settings: "SETTINGS", album: "ALBUM", back: "BACK", score: "SCORE", best: "BEST", gameover: "GAME OVER", restart: "RESTART", new: "NEW!", on: "ON", off: "OFF", next: "NEXT", menu: "MENU", sound: "SFX: ", music: "MUSIC: ", revive: "REVIVE", watchAd: "WATCH AD", cost: "50 COINS", credits: "developed by FelpnooDev" }
     };
 
     function getTxt(key) { return TEXTS[GameSettings.language][key] || "???"; }
+    function saveUserData() { localStorage.setItem('slime_coins', UserData.coins); localStorage.setItem('slime_highscore', UserData.highScore); localStorage.setItem('slimes_unlocked', JSON.stringify(UserData.unlocked)); }
 
     const GAME_WIDTH = 450, GAME_HEIGHT = 800, GRID_SIZE = 4, SLOT_SIZE = 90, MIN_SPAWN_DELAY = 600;
 
     // ==========================================
-    // 2. MÚSICA E ANÚNCIOS (SIMULADOS)
+    // 2. MÚSICA CONTROLLER
     // ==========================================
     const MusicController = {
         scene: null, currentSound: null, currentIndex: 0, tracks: ['loop1', 'loop2', 'loop3'],
@@ -70,18 +73,34 @@
         }
     };
 
-    function showInterstitial(callback) {
-        console.log("POKI_SDK: Exibindo anúncio de transição...");
-        // Simula delay de anúncio
-        setTimeout(callback, 500);
-    }
-
     // ==========================================
     // 3. CENAS
     // ==========================================
+
     class BootScene extends Phaser.Scene {
         constructor() { super('BootScene'); }
         preload() {
+            // Background de carregamento
+            const bg = this.add.graphics();
+            bg.fillStyle(0x050505, 1);
+            bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // Barra de Carregamento Neon
+            const progressBox = this.add.graphics();
+            const progressBar = this.add.graphics();
+            progressBox.lineStyle(2, 0x00ff7f, 0.3);
+            progressBox.strokeRoundedRect(GAME_WIDTH/2 - 160, GAME_HEIGHT/2, 320, 40, 10);
+
+            const loadingText = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 - 30, 'LOADING...', { fontSize: '20px', fill: '#00ff7f' }).setOrigin(0.5);
+
+            this.load.on('progress', (value) => {
+                progressBar.clear();
+                progressBar.fillStyle(0x00ff7f, 1);
+                progressBar.fillRoundedRect(GAME_WIDTH/2 - 155, GAME_HEIGHT/2 + 5, 310 * value, 30, 8);
+                loadingText.setText('LOADING: ' + Math.floor(value * 100) + '%');
+            });
+
+            // Assets
             this.load.image('background', 'assets/background.png');
             this.load.image('slot', 'assets/slot.png');
             this.load.image('particle', 'assets/particle.png');
@@ -91,24 +110,28 @@
             this.load.audio('loop2', 'assets/loop2.mp3');
             this.load.audio('loop3', 'assets/loop3.mp3');
         }
-        create() { this.scene.start('StartScene'); }
+        create() { 
+            document.title = "Slime Rush Evolution";
+            this.scene.start('StartScene'); 
+        }
     }
 
     class StartScene extends Phaser.Scene {
         constructor() { super('StartScene'); }
         create() {
+            this.cameras.main.fadeIn(500, 0, 0, 0);
             MusicController.init(this);
             this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'background').setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
             
-            // Título
             this.add.text(GAME_WIDTH/2, 180, getTxt('title'), { fontFamily: 'Arial Black', fontSize: '54px', color: '#fff', stroke: '#00ff7f', strokeThickness: 10 }).setOrigin(0.5);
-            
-            // Moedas
-            this.add.text(GAME_WIDTH - 20, 20, `💰 ${UserData.coins}`, { fontSize: '20px', fontStyle: 'bold' }).setOrigin(1,0);
+            this.add.text(GAME_WIDTH - 20, 25, `💰 ${UserData.coins}`, { fontSize: '20px', fontStyle: 'bold' }).setOrigin(1,0);
 
-            this.createBtn(GAME_WIDTH/2, 380, getTxt('play'), 0x00cc00, () => this.scene.start('MainScene'));
-            this.createBtn(GAME_WIDTH/2, 480, getTxt('album'), 0x0055ff, () => this.scene.start('AlbumScene'));
-            this.createBtn(GAME_WIDTH/2, 580, getTxt('settings'), 0x444444, () => this.scene.start('SettingsScene'));
+            this.createBtn(GAME_WIDTH/2, 380, getTxt('play'), 0x00cc00, () => this.transitionTo('MainScene'));
+            this.createBtn(GAME_WIDTH/2, 480, getTxt('album'), 0x0055ff, () => this.transitionTo('AlbumScene'));
+            this.createBtn(GAME_WIDTH/2, 580, getTxt('settings'), 0x444444, () => this.transitionTo('SettingsScene'));
+
+            // Créditos no Rodapé
+            this.add.text(GAME_WIDTH/2, GAME_HEIGHT - 40, getTxt('credits'), { fontSize: '14px', color: '#00ff7f', alpha: 0.6, fontStyle: 'italic' }).setOrigin(0.5);
         }
         createBtn(x, y, txt, col, cb) {
             const btn = this.add.container(x, y);
@@ -117,16 +140,20 @@
             btn.add([bg, label]);
             bg.on('pointerdown', () => this.tweens.add({ targets: btn, scale: 0.9, duration: 100, yoyo: true, onComplete: cb }));
         }
+        transitionTo(key) {
+            this.cameras.main.fadeOut(300, 0, 0, 0);
+            this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(key));
+        }
     }
 
     class MainScene extends Phaser.Scene {
         constructor() { super('MainScene'); }
         create() {
+            this.cameras.main.fadeIn(400, 0, 0, 0);
             this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'background').setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
             this.score = 0; this.comboCount = 1; this.lastMergeTime = 0;
             this.isGameOver = false; this.revived = false;
             this.gridItems = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(null));
-            
             this.currentSpawnDelay = 2000; this.nextSpawnTime = 0;
             
             this.offsetX = (GAME_WIDTH - (GRID_SIZE * SLOT_SIZE)) / 2 + (SLOT_SIZE/2);
@@ -134,7 +161,6 @@
             
             this.createUI();
             this.drawGrid();
-            
             this.particles = this.add.particles(0, 0, 'particle', { speed: { min: -100, max: 100 }, scale: { start: 0.6, end: 0 }, blendMode: 'ADD', lifespan: 600, emitting: false });
 
             this.spawnSlime(0); this.spawnSlime(0);
@@ -144,11 +170,14 @@
         createUI() {
             this.scoreText = this.add.text(20, 70, '0', { fontSize: '32px', fontStyle: 'bold' });
             this.highScoreText = this.add.text(GAME_WIDTH-20, 70, UserData.highScore, { fontSize: '32px', color: '#ffd700' }).setOrigin(1,0);
-            this.timerBar = this.add.rectangle(GAME_WIDTH/2 - 150, 135, 0, 20, 0x00ff00).setOrigin(0, 0.5);
+            this.timerBar = this.add.rectangle(GAME_WIDTH/2 - 150, 135, 0, 20, 0x00ff7f).setOrigin(0, 0.5);
             this.comboText = this.add.text(GAME_WIDTH/2, 200, '', { fontSize: '40px', fontStyle: 'bold', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0);
             
-            const mBtn = this.add.text(20, 20, '🏠 ' + getTxt('menu'), { fontSize: '16px', backgroundColor: '#333', padding: 6 }).setInteractive({ useHandCursor: true });
-            mBtn.on('pointerdown', () => showInterstitial(() => this.scene.start('StartScene')));
+            const mBtn = this.add.text(20, 25, '🏠 ' + getTxt('menu'), { fontSize: '14px', backgroundColor: '#333', padding: 6 }).setInteractive({ useHandCursor: true });
+            mBtn.on('pointerdown', () => {
+                this.cameras.main.fadeOut(300);
+                this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('StartScene'));
+            });
         }
 
         drawGrid() {
@@ -159,15 +188,13 @@
         update(t) {
             if (this.isGameOver) return;
             
-            // --- LÓGICA DE PÂNICO ---
             const count = this.getOccupiedCount();
             if (count >= 13) {
-                this.timerBar.setFillStyle(0xff0000); // Fica vermelho
-                if (t % 500 < 250) this.timerBar.setAlpha(0.5); else this.timerBar.setAlpha(1); // Pisca
-                if (MusicController.currentSound) MusicController.currentSound.setRate(1.1); // Som acelera
+                this.timerBar.setFillStyle(0xff3333);
+                if (t % 400 < 200) this.timerBar.setAlpha(0.4); else this.timerBar.setAlpha(1);
+                if (MusicController.currentSound) MusicController.currentSound.setRate(1.15);
             } else {
-                this.timerBar.setFillStyle(0x00ff00);
-                this.timerBar.setAlpha(1);
+                this.timerBar.setFillStyle(0x00ff7f); this.timerBar.setAlpha(1);
                 if (MusicController.currentSound) MusicController.currentSound.setRate(1.0);
             }
 
@@ -177,37 +204,23 @@
 
             if (t >= this.nextSpawnTime) {
                 if (this.spawnSlime(0)) {
-                    // DIFICULDADE AMANDA: Chance de spawn duplo sobe com score
-                    const dChance = Math.min(0.5, this.score / 15000);
+                    const dChance = Math.min(0.6, this.score / 12000);
                     if (Math.random() < dChance) this.time.delayedCall(200, () => this.spawnSlime(0));
-
                     this.nextSpawnTime = t + this.currentSpawnDelay;
                     this.currentSpawnDelay = Math.max(MIN_SPAWN_DELAY, this.currentSpawnDelay - 20);
                 } else this.handleGameOver();
             }
         }
 
-        getOccupiedCount() {
-            let n = 0;
-            for(let r=0; r<GRID_SIZE; r++) for(let c=0; c<GRID_SIZE; c++) if (this.gridItems[r][c]) n++;
-            return n;
-        }
-
+        getOccupiedCount() { let n = 0; for(let r=0; r<GRID_SIZE; r++) for(let c=0; c<GRID_SIZE; c++) if (this.gridItems[r][c]) n++; return n; }
+        
         spawnSlime(lvl) {
             const e = this.getEmpty();
-            if (e.length) { 
-                const s = Phaser.Utils.Array.GetRandom(e); 
-                this.createSlime(s.c, s.r, lvl); 
-                return true; 
-            }
+            if (e.length) { const s = Phaser.Utils.Array.GetRandom(e); this.createSlime(s.c, s.r, lvl); return true; }
             return false;
         }
 
-        getEmpty() {
-            let out = [];
-            for(let r=0; r<GRID_SIZE; r++) for(let c=0; c<GRID_SIZE; c++) if (!this.gridItems[r][c]) out.push({r,c});
-            return out;
-        }
+        getEmpty() { let out = []; for(let r=0; r<GRID_SIZE; r++) for(let c=0; c<GRID_SIZE; c++) if (!this.gridItems[r][c]) out.push({r,c}); return out; }
 
         createSlime(c, r, lvl) {
             const container = this.add.container(this.offsetX + c*SLOT_SIZE, this.offsetY + r*SLOT_SIZE);
@@ -218,7 +231,7 @@
             if (lvl > 6) {
                 const cols = [0xff3333, 0xffd700, 0x3333ff, 0xff00ff, 0x00ffff, 0xffffff];
                 sprite.setTint(cols[(lvl-7) % cols.length]);
-                this.tweens.add({ targets: sprite, scale: bScale * 1.05, yoyo: true, repeat: -1, duration: 800 });
+                this.tweens.add({ targets: sprite, scale: bScale * 1.06, yoyo: true, repeat: -1, duration: 800 });
             }
 
             const val = Math.pow(2, lvl+1);
@@ -229,7 +242,7 @@
             container.setSize(80,80).setInteractive({ draggable: true });
             container.level = lvl; container.gridCol = c; container.gridRow = r;
             this.input.setDraggable(container);
-            container.on('dragstart', () => { this.children.bringToTop(container); container.setScale(1.2); });
+            container.on('dragstart', () => { this.children.bringToTop(container); container.setScale(1.25); });
             container.on('drag', (p, dx, dy) => { container.x = dx; container.y = dy; });
             container.on('dragend', () => { container.setScale(1); this.handleDrop(container); });
             this.gridItems[r][c] = container;
@@ -258,30 +271,22 @@
             const r = s2.gridRow, c = s2.gridCol, nL = s2.level + 1;
             this.tweens.add({ targets: [s1, s2], scale: 0, duration: 100, onComplete: () => {
                 s1.destroy(); s2.destroy();
-                this.particles.emitParticleAt(this.offsetX + c*SLOT_SIZE, this.offsetY + r*SLOT_SIZE, 15);
-                this.cameras.main.shake(100, 0.005);
+                this.particles.emitParticleAt(this.offsetX + c*SLOT_SIZE, this.offsetY + r*SLOT_SIZE, 18);
+                this.cameras.main.shake(100, 0.006);
                 const now = this.time.now;
                 if (now - this.lastMergeTime < 1000) { this.comboCount++; this.showCombo(); }
                 else this.comboCount = 1;
                 this.lastMergeTime = now;
                 if (GameSettings.soundOn) this.sound.play('pop', { detune: Math.min(nL*200, 2400) });
-                
-                // Ganha Moedas
                 UserData.coins += (nL + 1);
-                
-                if (!UserData.unlocked.includes(nL) && nL <= 6) { 
-                    UserData.unlocked.push(nL); 
-                    saveUserData(); 
-                    this.showNewPopup(nL); 
-                }
-                
+                if (!UserData.unlocked.includes(nL) && nL <= 6) { UserData.unlocked.push(nL); saveUserData(); this.showNewPopup(nL); }
                 this.createSlime(c, r, nL);
                 this.updateScore(Math.pow(2, nL+1) * this.comboCount);
-                this.nextSpawnTime += 400;
+                this.nextSpawnTime += 450;
             }});
         }
 
-        showCombo() { if (this.comboCount < 2) return; this.comboText.setText(`COMBO X${this.comboCount}!`).setAlpha(1).setScale(0.5); this.tweens.add({ targets: this.comboText, scale: 1.5, alpha: 0, duration: 800 }); }
+        showCombo() { if (this.comboCount < 2) return; this.comboText.setText(`COMBO X${this.comboCount}!`).setAlpha(1).setScale(0.5); this.tweens.add({ targets: this.comboText, scale: 1.4, alpha: 0, duration: 800 }); }
         
         showNewPopup(lvl) {
             const p = this.add.container(GAME_WIDTH/2, GAME_HEIGHT/2).setDepth(2000);
@@ -292,68 +297,52 @@
 
         handleGameOver() {
             if (this.revived) { this.triggerDeath(); return; }
-            
-            // Popup de Reviver
             this.isGameOver = true;
             const revPanel = this.add.container(GAME_WIDTH/2, GAME_HEIGHT/2).setDepth(5000);
-            const bg = this.add.rectangle(0,0, 320, 300, 0x000000, 0.95).setStrokeStyle(4, 0x00ff7f);
-            const title = this.add.text(0, -100, getTxt('revive'), { fontSize: '32px', fontStyle: 'bold' }).setOrigin(0.5);
+            const bg = this.add.rectangle(0,0, 320, 340, 0x000000, 0.95).setStrokeStyle(4, 0x00ff7f);
+            const title = this.add.text(0, -110, getTxt('revive'), { fontSize: '32px', fontStyle: 'bold' }).setOrigin(0.5);
             
             const btnAd = this.add.container(0, -10).setInteractive(new Phaser.Geom.Rectangle(-120, -30, 240, 60), Phaser.Geom.Rectangle.Contains);
-            const bgAd = this.add.rectangle(0,0, 240, 60, 0x0055ff).setStrokeStyle(2, 0xffffff);
-            const txtAd = this.add.text(0,0, getTxt('watchAd'), { fontSize: '20px' }).setOrigin(0.5);
-            btnAd.add([bgAd, txtAd]);
+            btnAd.add([this.add.rectangle(0,0, 240, 60, 0x0055ff).setStrokeStyle(2, 0xffffff), this.add.text(0,0, getTxt('watchAd'), { fontSize: '20px' }).setOrigin(0.5)]);
 
             const btnCoin = this.add.container(0, 80).setInteractive(new Phaser.Geom.Rectangle(-120, -30, 240, 60), Phaser.Geom.Rectangle.Contains);
-            const bgCoin = this.add.rectangle(0,0, 240, 60, UserData.coins >= 50 ? 0xcc9900 : 0x444444).setStrokeStyle(2, 0xffffff);
-            const txtCoin = this.add.text(0,0, getTxt('cost'), { fontSize: '20px' }).setOrigin(0.5);
-            btnCoin.add([bgCoin, txtCoin]);
+            btnCoin.add([this.add.rectangle(0,0, 240, 60, UserData.coins >= 50 ? 0xcc9900 : 0x444444).setStrokeStyle(2, 0xffffff), this.add.text(0,0, getTxt('cost'), { fontSize: '20px' }).setOrigin(0.5)]);
 
-            const skip = this.add.text(0, 160, "SKIP", { fontSize: '14px', color: '#888' }).setOrigin(0.5).setInteractive();
-
+            const skip = this.add.text(0, 160, "NO, THANKS", { fontSize: '14px', color: '#888' }).setOrigin(0.5).setInteractive();
             revPanel.add([bg, title, btnAd, btnCoin, skip]);
 
-            btnAd.on('pointerdown', () => { 
-                console.log("SIMULANDO AD...");
-                this.reviveAction(revPanel);
-            });
-
-            btnCoin.on('pointerdown', () => {
-                if (UserData.coins >= 50) {
-                    UserData.coins -= 50;
-                    saveUserData();
-                    this.reviveAction(revPanel);
-                }
-            });
-
+            btnAd.on('pointerdown', () => this.reviveAction(revPanel));
+            btnCoin.on('pointerdown', () => { if (UserData.coins >= 50) { UserData.coins -= 50; saveUserData(); this.reviveAction(revPanel); } });
             skip.on('pointerdown', () => this.triggerDeath());
         }
 
         reviveAction(panel) {
-            panel.destroy();
-            this.revived = true;
-            this.isGameOver = false;
-            // Limpa slimes baixos para dar espaço
-            for(let r=0; r<GRID_SIZE; r++) {
-                for(let c=0; c<GRID_SIZE; c++) {
-                    if (this.gridItems[r][c] && this.gridItems[r][c].level <= 1) {
-                        this.gridItems[r][c].destroy();
-                        this.gridItems[r][c] = null;
-                    }
-                }
-            }
+            panel.destroy(); this.revived = true; this.isGameOver = false;
+            for(let r=0; r<GRID_SIZE; r++) for(let c=0; c<GRID_SIZE; c++) if (this.gridItems[r][c] && this.gridItems[r][c].level <= 1) { this.gridItems[r][c].destroy(); this.gridItems[r][c] = null; }
             this.nextSpawnTime = this.time.now + 3000;
         }
 
         snap(s) { this.tweens.add({ targets: s, x: this.offsetX + s.gridCol*SLOT_SIZE, y: this.offsetY + s.gridRow*SLOT_SIZE, duration: 200 }); }
-        triggerDeath() { this.isGameOver = true; this.cameras.main.shake(500, 0.02); saveUserData(); this.time.delayedCall(1000, () => { window.onkeydown = null; this.scene.start('GameOverScene', { score: this.score }); }); }
-        updateScore(pts) { this.score += pts; this.scoreText.setText(this.score); if (this.score > UserData.highScore) { UserData.highScore = this.score; this.highScoreText.setText(this.score); } }
+        
+        triggerDeath() { 
+            this.isGameOver = true; this.cameras.main.shake(500, 0.02); saveUserData(); 
+            this.cameras.main.fadeOut(1000);
+            this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('GameOverScene', { score: this.score })); 
+        }
+
+        updateScore(pts) { 
+            this.score += pts; this.scoreText.setText(this.score); 
+            document.title = `Slime Rush - Score: ${this.score}`;
+            if (this.score > UserData.highScore) { UserData.highScore = this.score; this.highScoreText.setText(this.score); } 
+        }
+        
         activateDev() { window.onkeydown = (e) => { if(this.isGameOver) return; const k = e.key.toUpperCase(); if (['1','2','3','4','5','6','7','8','9'].includes(k)) this.spawnSlime(parseInt(k)); if (k === 'G') this.triggerDeath(); if (k === 'C') this.scene.restart(); }; }
     }
 
     class AlbumScene extends Phaser.Scene {
         constructor() { super('AlbumScene'); }
         create() {
+            this.cameras.main.fadeIn(400);
             this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'background').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setAlpha(0.4);
             this.add.text(GAME_WIDTH/2, 80, getTxt('album'), { fontSize: '32px', fontStyle: 'bold' }).setOrigin(0.5);
             const startX = 115, startY = 220, spacing = 110;
@@ -363,19 +352,21 @@
                 if (!UserData.unlocked.includes(i)) s.setTint(0x000000).setAlpha(0.5);
                 else this.add.text(x, y + 45, Math.pow(2, i+1), { fontSize: '14px', fontStyle: 'bold' }).setOrigin(0.5);
             }
-            const b = this.add.text(GAME_WIDTH/2, 720, getTxt('back'), { fontSize: '20px', backgroundColor: '#f00', padding: 10 }).setOrigin(0.5).setInteractive();
-            b.on('pointerdown', () => this.scene.start('StartScene'));
+            const b = this.add.text(GAME_WIDTH/2, 720, getTxt('back'), { fontSize: '20px', backgroundColor: '#f00', padding: 12 }).setOrigin(0.5).setInteractive();
+            b.on('pointerdown', () => { this.cameras.main.fadeOut(300); this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('StartScene')); });
         }
     }
 
     class SettingsScene extends Phaser.Scene {
         constructor() { super('SettingsScene'); }
         create() {
+            this.cameras.main.fadeIn(400);
             this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'background').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setAlpha(0.3);
+            this.add.text(GAME_WIDTH/2, 120, getTxt('settings'), { fontSize: '32px', fontStyle: 'bold' }).setOrigin(0.5);
             this.createBtn(GAME_WIDTH/2, 280, getTxt('sound') + (GameSettings.soundOn ? getTxt('on') : getTxt('off')), GameSettings.soundOn ? 0x00aa00 : 0xaa0000, () => { GameSettings.soundOn = !GameSettings.soundOn; this.scene.restart(); });
             this.createBtn(GAME_WIDTH/2, 380, getTxt('music') + (GameSettings.musicOn ? getTxt('on') : getTxt('off')), GameSettings.musicOn ? 0x00aa00 : 0xaa0000, () => { GameSettings.musicOn = !GameSettings.musicOn; if (GameSettings.musicOn) MusicController.start(); else MusicController.stop(); this.scene.restart(); });
             this.createBtn(GAME_WIDTH/2, 480, getTxt('lang'), 0x0055ff, () => { const l = ['pt', 'en']; GameSettings.language = l[(l.indexOf(GameSettings.language) + 1) % l.length]; this.scene.restart(); });
-            this.createBtn(GAME_WIDTH/2, 680, getTxt('back'), 0xcc0000, () => this.scene.start('StartScene'));
+            this.createBtn(GAME_WIDTH/2, 680, getTxt('back'), 0xcc0000, () => { this.cameras.main.fadeOut(300); this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('StartScene')); });
         }
         createBtn(x, y, txt, col, cb) {
             const bg = this.add.rectangle(x, y, 350, 60, col).setInteractive({ useHandCursor: true }).setStrokeStyle(2, 0xffffff);
@@ -387,16 +378,22 @@
     class GameOverScene extends Phaser.Scene {
         constructor() { super('GameOverScene'); }
         create(d) {
+            this.cameras.main.fadeIn(1000);
             this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9);
             this.add.text(GAME_WIDTH/2, 300, getTxt('gameover'), { fontSize: '48px', color: '#f00', fontStyle: 'bold' }).setOrigin(0.5);
             this.add.text(GAME_WIDTH/2, 400, getTxt('score') + ": " + d.score, { fontSize: '32px' }).setOrigin(0.5);
             const r = this.add.rectangle(GAME_WIDTH/2, 550, 250, 60, 0xfff).setInteractive();
             this.add.text(GAME_WIDTH/2, 550, getTxt('restart'), { fontSize: '24px', color: '#000' }).setOrigin(0.5);
-            r.on('pointerdown', () => showInterstitial(() => this.scene.start('MainScene')));
+            r.on('pointerdown', () => { this.cameras.main.fadeOut(500); this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('MainScene')); });
         }
     }
 
-    const config = { type: Phaser.AUTO, width: GAME_WIDTH, height: GAME_HEIGHT, parent: 'game-container', backgroundColor: '#000000', scene: [BootScene, StartScene, AlbumScene, SettingsScene, MainScene, GameOverScene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH } };
+    const config = { 
+        type: Phaser.AUTO, width: GAME_WIDTH, height: GAME_HEIGHT, 
+        parent: 'game-container', backgroundColor: '#000000', 
+        scene: [BootScene, StartScene, AlbumScene, SettingsScene, MainScene, GameOverScene], 
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH } 
+    };
     new Phaser.Game(config);
 </script>
 </body>
