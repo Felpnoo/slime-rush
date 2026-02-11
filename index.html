@@ -4,11 +4,170 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Slime Rush Evolution - Amanda Edition</title>
-    <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { box-shadow: 0 0 20px rgba(0, 255, 150, 0.2); border-radius: 8px; }
+    </style>
 </head>
 <body>
-    <div id="game-container"></div>
-    <script src="game.js"></script>
+<script>
+// Configurações de Dificuldade (Conforme pedido pela Amanda)
+const SETTINGS = {
+    EASY:   { label: "FÁCIL",   min: 1, max: 1, tripleChance: 0,    speed: 1000 },
+    MEDIUM: { label: "MÉDIO",   min: 1, max: 2, tripleChance: 0.08, speed: 800 },
+    HARD:   { label: "DIFÍCIL", min: 1, max: 3, tripleChance: 0.25, speed: 600 }
+};
+
+class MenuScene extends Phaser.Scene {
+    constructor() { super('MenuScene'); }
+    preload() {
+        // Correção do erro: Phaser 3.60 usa setCORS
+        this.load.setCORS('anonymous');
+        this.load.baseURL = 'assets/'; // Garanta que as imagens estão na pasta assets/
+        
+        for (let i = 1; i <= 11; i++) {
+            this.load.image(`slime_${i}`, `slime_${i}.png`);
+        }
+    }
+    create() {
+        this.add.text(225, 150, 'SLIME RUSH\nEVOLUTION', { 
+            fontSize: '40px', fill: '#0f0', align: 'center', fontStyle: 'bold' 
+        }).setOrigin(0.5);
+
+        ['EASY', 'MEDIUM', 'HARD'].forEach((diff, i) => {
+            let btn = this.add.text(225, 400 + (i * 80), SETTINGS[diff].label, { 
+                fontSize: '32px', fill: '#fff', backgroundColor: '#222', padding: {x:20, y:10}
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+            btn.on('pointerdown', () => this.scene.start('MainScene', { difficulty: diff }));
+            btn.on('pointerover', () => btn.setStyle({ fill: '#0f0' }));
+            btn.on('pointerout', () => btn.setStyle({ fill: '#fff' }));
+        });
+    }
+}
+
+class MainScene extends Phaser.Scene {
+    constructor() { super('MainScene'); }
+    init(data) {
+        this.diff = SETTINGS[data.difficulty || 'MEDIUM'];
+        this.score = 0;
+        this.isGameOver = false;
+        this.isTrailer = false;
+    }
+    create() {
+        this.slimes = this.add.group({ maxSize: 16 });
+        this.grid = Array(4).fill().map(() => Array(4).fill(null));
+        
+        // Criar Background do Grid
+        for(let r=0; r<4; r++)
+            for(let c=0; c<4; c++)
+                this.add.rectangle(c * 100 + 75, r * 100 + 250, 90, 90, 0x1a1a1a);
+
+        this.spawnSlime(2);
+        this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: '24px', fill: '#fff' });
+        
+        // Tecla T para o Trailer no NixOS
+        this.input.keyboard.on('keydown-T', () => this.startTrailer());
+    }
+
+    spawnSlime(forced = null) {
+        if (this.isGameOver) return;
+        let slots = this.getEmpty();
+        if (slots.length === 0) return this.endGame();
+
+        let count = forced || 1;
+        if (!forced) {
+            let roll = Math.random();
+            if (this.diff.max === 3 && roll < this.diff.tripleChance) count = 3;
+            else if (this.diff.max >= 2 && roll > 0.6) count = 2;
+        }
+
+        count = Math.min(count, slots.length);
+        for (let i = 0; i < count; i++) {
+            let slot = Phaser.Utils.Array.GetRandom(this.getEmpty());
+            if (slot) this.addSlime(slot.r, slot.c, Math.random() > 0.9 ? 2 : 1);
+        }
+    }
+
+    addSlime(r, c, lvl) {
+        let s = this.slimes.get(c * 100 + 75, r * 100 + 250, `slime_${lvl}`);
+        if (s) {
+            s.setActive(true).setVisible(true).setScale(0).setAlpha(1);
+            s.level = lvl; s.gridR = r; s.gridC = c;
+            this.grid[r][c] = s;
+            this.tweens.add({ targets: s, scale: 1, duration: 200, ease: 'Back.out' });
+        }
+    }
+
+    merge(s1, s2) {
+        let nLvl = s1.level + 1;
+        this.cameras.main.shake(100, 0.01);
+        
+        if (nLvl === 11) { // 2048 - Efeito Especial Amanda
+            this.cameras.main.flash(1000, 255, 215, 0);
+            this.time.timeScale = 0.5;
+            this.time.delayedCall(1000, () => this.time.timeScale = 1);
+        }
+
+        this.grid[s1.gridR][s1.gridC] = null;
+        s1.setActive(false).setVisible(false);
+        s2.setTexture(`slime_${nLvl}`);
+        s2.level = nLvl;
+
+        this.score += Math.pow(2, nLvl);
+        this.scoreText.setText(`Score: ${this.score}`);
+        this.time.delayedCall(300, () => this.spawnSlime());
+    }
+
+    // Lógica do Trailer (Autoplay)
+    startTrailer() {
+        if (this.isTrailer) return;
+        this.isTrailer = true;
+        this.cameras.main.zoomTo(1.1, 2000);
+        this.time.addEvent({
+            delay: 600,
+            callback: () => {
+                let moved = false;
+                for(let r=0; r<4; r++) {
+                    for(let c=0; c<4; c++) {
+                        let s1 = this.grid[r][c];
+                        if (!s1) continue;
+                        [[0,1],[1,0],[0,-1],[-1,0]].forEach(([dr, dc]) => {
+                            let nr = r+dr, nc = c+dc;
+                            if(nr>=0 && nr<4 && nc>=0 && nc<4 && !moved) {
+                                let s2 = this.grid[nr][nc];
+                                if(s2 && s2.level === s1.level) { this.merge(s1, s2); moved = true; }
+                            }
+                        });
+                    }
+                }
+                if(!moved) this.spawnSlime();
+            },
+            loop: true
+        });
+    }
+
+    getEmpty() {
+        let e = [];
+        for(let r=0; r<4; r++) for(let c=0; c<4; c++) if(!this.grid[r][c]) e.push({r,c});
+        return e;
+    }
+
+    endGame() {
+        this.isGameOver = true;
+        this.add.text(225, 400, 'FIM DE JOGO', { fontSize: '48px', fill: '#f00', fontStyle: 'bold' }).setOrigin(0.5);
+    }
+}
+
+const config = {
+    type: Phaser.AUTO,
+    width: 450, height: 800,
+    backgroundColor: '#0a0a0a',
+    parent: 'game-container',
+    scene: [MenuScene, MainScene]
+};
+new Phaser.Game(config);
+</script>
 </body>
 </html>
